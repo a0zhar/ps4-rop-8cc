@@ -7,7 +7,13 @@ PS4-ROP-8cc is a toy C compiler that is a fork of sleirsgoevy's 8cc repository. 
 # Changelog
 ### 16/04/23:
 #### gen.c
-- use switch statement instead of if-else if in function `emit_lload()`
+- `static void emit_lload(Type* ty, char* base, int off)`
+  - use switch statement instead of if-else if in function 
+- `static char** read_source_file(char* file)`
+  - Added error handling: New version includes error handling to check for errors in opening the file and allocating memory for the buffer. If any errors occur, the function will properly free memory and close the file then return NULL.
+  - Improved error reporting: New version includes nlprintf (printf macro which does newline by default) calls to report any errors encountered during file reading and memory allocation. This provides more detailed information for debugging purposes.
+  - Code readability: New version has more structured code and is easier to read as compared to previous version which is condensed and not as readable.
+
 ### 15/04/23:
 #### parse.c
 - use switch statement instead of if-else if in function `make_numtype()`
