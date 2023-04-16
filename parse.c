@@ -12,9 +12,9 @@
 #include <strings.h>
 #include "8cc.h"
 
-// The largest alignment requirement on x86-64. When we are allocating memory
-// for an array whose type is unknown, the array will be aligned to this
-// boundary.
+ // The largest alignment requirement on x86-64. When we are allocating memory
+ // for an array whose type is unknown, the array will be aligned to this
+ // boundary.
 #define MAX_ALIGN 16
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -119,7 +119,6 @@ static void mark_location() {
     source_loc->file = tok->file->name;
     source_loc->line = tok->line;
 }
-
 
 /*
  * Constructors
@@ -228,14 +227,16 @@ static Node* ast_string(int enc, char* str, int len) {
             ty = make_array_type(type_char, len);
             body = str;
             break;
-        case ENC_CHAR16: {
+        case ENC_CHAR16:
+            {
                 Buffer* b = to_utf16(str, len);
                 ty = make_array_type(type_ushort, buf_len(b) / type_ushort->size);
                 body = buf_body(b);
                 break;
             }
         case ENC_CHAR32:
-        case ENC_WCHAR: {
+        case ENC_WCHAR:
+            {
                 Buffer* b = to_utf32(str, len);
                 ty = make_array_type(type_uint, buf_len(b) / type_uint->size);
                 body = buf_body(b);
@@ -353,17 +354,19 @@ static Type* make_numtype(int kind, bool usig) {
     Type* r = calloc(1, sizeof(Type));
     r->kind = kind;
     r->usig = usig;
-    if (kind == KIND_VOID)         r->size = r->align = 0;
-    else if (kind == KIND_BOOL)    r->size = r->align = 1;
-    else if (kind == KIND_CHAR)    r->size = r->align = 1;
-    else if (kind == KIND_SHORT)   r->size = r->align = 2;
-    else if (kind == KIND_INT)     r->size = r->align = 4;
-    else if (kind == KIND_LONG)    r->size = r->align = 8;
-    else if (kind == KIND_LLONG)   r->size = r->align = 8;
-    else if (kind == KIND_FLOAT)   r->size = r->align = 4, error("float");
-    else if (kind == KIND_DOUBLE)  r->size = r->align = 8, error("float");
-    else if (kind == KIND_LDOUBLE) r->size = r->align = 8, error("float");
-    else error("internal error");
+    switch (kind) {
+        case KIND_VOID:    r->size = r->align = 0; break;
+        case KIND_BOOL:    r->size = r->align = 1; break;
+        case KIND_CHAR:    r->size = r->align = 1; break;
+        case KIND_SHORT:   r->size = r->align = 2; break;
+        case KIND_INT:     r->size = r->align = 4; break;
+        case KIND_LONG:    r->size = r->align = 8; break;
+        case KIND_LLONG:   r->size = r->align = 8; break;
+        case KIND_FLOAT:   r->size = r->align = 4, error("float"); break;
+        case KIND_DOUBLE:  r->size = r->align = 8, error("float"); break;
+        case KIND_LDOUBLE: r->size = r->align = 8, error("float"); break;
+        default: error("internal error"); break;
+    };
     return r;
 }
 
@@ -517,13 +520,13 @@ static Node* conv(Node* node) {
     Type* ty = node->ty;
     switch (ty->kind) {
         case KIND_ARRAY:
-            // C11 6.3.2.1p3: An array of T is converted to a pointer to T.
+        // C11 6.3.2.1p3: An array of T is converted to a pointer to T.
             return ast_uop(AST_CONV, make_ptr_type(ty->ptr), node);
         case KIND_FUNC:
-            // C11 6.3.2.1p4: A function designator is converted to a pointer to the function.
+        // C11 6.3.2.1p4: A function designator is converted to a pointer to the function.
             return ast_uop(AST_ADDR, make_ptr_type(ty), node);
         case KIND_SHORT: case KIND_CHAR: case KIND_BOOL:
-            // C11 6.3.1.1p2: The integer promotions
+        // C11 6.3.1.1p2: The integer promotions
             return ast_conv(type_int, node);
         case KIND_INT:
             if (ty->bitsize > 0 && ty->bitsize != -1)
@@ -605,7 +608,8 @@ static bool is_same_struct(Type* a, Type* b) {
                 is_same_struct(a->ptr, b->ptr);
         case KIND_PTR:
             return is_same_struct(a->ptr, b->ptr);
-        case KIND_STRUCT: {
+        case KIND_STRUCT:
+            {
                 if (a->is_struct != b->is_struct)
                     return false;
                 Vector* ka = dict_keys(a->fields);
@@ -666,7 +670,8 @@ int eval_intexpr(Node* node, Node** addr) {
             if (node->operand->ty->kind == KIND_PTR)
                 return eval_intexpr(node->operand, addr);
             goto error;
-        case AST_TERNARY: {
+        case AST_TERNARY:
+            {
                 long cond = eval_intexpr(node->cond, addr);
                 if (cond)
                     return node->then ? eval_intexpr(node->then, addr) : cond;
@@ -674,21 +679,21 @@ int eval_intexpr(Node* node, Node** addr) {
             }
 #define L (eval_intexpr(node->left, addr))
 #define R (eval_intexpr(node->right, addr))
-        case '+': return L + R;
-        case '-': return L - R;
-        case '*': return L * R;
-        case '/': return L / R;
-        case '<': return L < R;
-        case '^': return L ^ R;
-        case '&': return L & R;
-        case '|': return L | R;
-        case '%': return L % R;
-        case OP_EQ: return L == R;
-        case OP_LE: return L <= R;
-        case OP_NE: return L != R;
-        case OP_SAL: return L << R;
-        case OP_SAR: return L >> R;
-        case OP_SHR: return ((unsigned long)L) >> R;
+        case '+':       return L + R;
+        case '-':       return L - R;
+        case '*':       return L * R;
+        case '/':       return L / R;
+        case '<':       return L < R;
+        case '^':       return L ^ R;
+        case '&':       return L & R;
+        case '|':       return L | R;
+        case '%':       return L % R;
+        case OP_EQ:     return L == R;
+        case OP_LE:     return L <= R;
+        case OP_NE:     return L != R;
+        case OP_SAL:    return L << R;
+        case OP_SAR:    return L >> R;
+        case OP_SHR:    return ((unsigned long)L) >> R;
         case OP_LOGAND: return L && R;
         case OP_LOGOR:  return L || R;
 #undef L
@@ -2043,24 +2048,26 @@ static int read_alignas() {
     expect(')');
     return r;
 }
-
+/* Read a declaration specifier from the input token stream.
+ * @param[out] rsclass pointer to integer variable to store the storage class specifier
+ * @return pointer to the type object corresponding to the specifier */
 static Type* read_decl_spec(int* rsclass) {
-    int sclass = 0;
-    Token* tok = peek();
-    if (!is_type(tok))
+    int sclass = 0;             // storage class specifier
+    Token* tok = peek();        // peek the next token in the input stream
+    if (!is_type(tok)) {        // check if the token is a type
         errort(tok, "type name expected, but got %s", tok2s(tok));
-
-    Type* usertype = NULL;
-    enum { kvoid = 1, kbool, kchar, kint, kfloat, kdouble } kind = 0;
-    enum { kshort = 1, klong, kllong } size = 0;
-    enum { ksigned = 1, kunsigned } sig = 0;
-    int align = -1;
+    }
+    Type* usertype = NULL;      // user-defined type specifier
+    enum { kvoid = 1, kbool, kchar, kint, kfloat, kdouble } kind = 0;   // built-in type specifier
+    enum { kshort = 1, klong, kllong } size = 0;                        // size specifier
+    enum { ksigned = 1, kunsigned } sig = 0;                           // sign specifier
+    int align = -1;             // alignment specifier, default is -1 to indicate not specified
 
     for (;;) {
-        tok = get();
-        if (tok->kind == EOF)
+        tok = get();            // get the next token in the input stream
+        if (tok->kind == EOF) { // check if the token is the end-of-file token
             error("premature end of input");
-        if (kind == 0 && tok->kind == TIDENT && !usertype) {
+        }if (kind == 0 && tok->kind == TIDENT && !usertype) {
             Type* def = get_typedef(tok->sval);
             if (def) {
                 if (usertype) goto err;
@@ -2094,7 +2101,8 @@ static Type* read_decl_spec(int* rsclass) {
             case KSTRUCT:   if (usertype) goto err; usertype = read_struct_def(); break;
             case KUNION:    if (usertype) goto err; usertype = read_union_def(); break;
             case KENUM:     if (usertype) goto err; usertype = read_enum_def(); break;
-            case KALIGNAS: {
+            case KALIGNAS:
+                {
                     int val = read_alignas();
                     if (val < 0)
                         errort(tok, "negative alignment: %d", val);
@@ -2105,13 +2113,15 @@ static Type* read_decl_spec(int* rsclass) {
                         align = val;
                     break;
                 }
-            case KLONG: {
+            case KLONG:
+                {
                     if (size == 0) size = klong;
                     else if (size == klong) size = kllong;
                     else goto err;
                     break;
                 }
-            case KTYPEOF: {
+            case KTYPEOF:
+                {
                     if (usertype) goto err;
                     usertype = read_typeof();
                     break;
@@ -2216,8 +2226,7 @@ static void read_decl(Vector* block, bool isglobal) {
         }
         if (next_token(';'))
             return;
-        if (!next_token(','))
-            errort(peek(), "';' or ',' are expected, but got %s", tok2s(peek()));
+        if (!next_token(','))errort(peek(), "';' or ',' are expected, but got %s", tok2s(peek()));
     }
 }
 
@@ -2660,10 +2669,7 @@ static Node* read_label(Token* tok) {
     return read_label_tail(r);
 }
 
-/*
- * Statement
- */
-
+//Statement
 static Node* read_stmt() {
     Token* tok = get();
     if (tok->kind == TKEYWORD) {
@@ -2739,7 +2745,7 @@ Vector* read_toplevels() {
  * Token handling
  */
 
-// C11 5.1.1.2p6 Adjacent string literal tokens are concatenated.
+ // C11 5.1.1.2p6 Adjacent string literal tokens are concatenated.
 static void concatenate_string(Token* tok) {
     int enc = tok->enc;
     Buffer* b = make_buffer();
