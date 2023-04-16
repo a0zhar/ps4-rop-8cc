@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "8cc.h"
-
+#define nlprintf(...) printf("\n"__VA_ARGS__)
 bool dumpstack = false;
 bool dumpsource = true;
 
@@ -737,17 +737,40 @@ static char** split(char* buf) {
 }
 
 #ifndef __eir__
+
 static char** read_source_file(char* file) {
+    // Open file for reading
     FILE* fp = fopen(file, "r");
-    if (!fp)
+    if (fp == NULL) {
+        nlprintf("fopen() on file %s failed", file);
         return NULL;
+    }
+    // Get Information about File
     struct stat st;
-    fstat(fileno(fp), &st);
-    char* buf = malloc(st.st_size + 1);
-    if (fread(buf, 1, st.st_size, fp) != st.st_size)
+    if (fstat(fileno(fp), &st) == -1) {
+        nlprintf("fstat failed!");
+        fclose(fp);
         return NULL;
-    fclose(fp);
-    buf[st.st_size] = '\0';
+    }
+    // Allocate buffer to the size of file
+    char* buf = malloc(st.st_size + 1);
+    // Check if allocation was successfull
+    if (buf == NULL) {
+        nlprintf("couldnt allocate buffer in read_source_file ");
+        fclose(fp);
+        return NULL;
+    }
+    buf[st.st_size] = '\0';// Null termination
+    
+    // Read the entire file into buffer
+    off_t readbytes = fread(buf, 1, st.st_size, fp);
+    fclose(fp);// close file stream
+    // check if the readbytes length dont match the file size
+    if (readbytes != st.st_size) {
+        nlprintf("readbytes and file size mismatch");
+        free(buf);
+        return NULL;
+    }
     return split(buf);
 }
 #endif
