@@ -5,6 +5,9 @@ PS4-ROP-8cc is a toy C compiler that is a fork of sleirsgoevy's 8cc repository. 
 
 
 # Changelog
+### 16/04/23:
+#### gen.c
+- use switch statement instead of if-else if in function `emit_lload()`
 ### 15/04/23:
 #### parse.c
 - use switch statement instead of if-else if in function `make_numtype()`
