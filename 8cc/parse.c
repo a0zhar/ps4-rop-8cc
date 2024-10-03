@@ -12,9 +12,9 @@
 #include <strings.h>
 #include "8cc.h"
 
-// The largest alignment requirement on x86-64. When we are allocating memory
-// for an array whose type is unknown, the array will be aligned to this
-// boundary.
+ // The largest alignment requirement on x86-64. When we are allocating memory
+ // for an array whose type is unknown, the array will be aligned to this
+ // boundary.
 #define MAX_ALIGN 16
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -42,28 +42,28 @@ static char *defaultcase;
 static char *lbreak;
 static char *lcontinue;
 
-// Objects representing basic types. All variables will be of one of these types
-// or a derived type from one of them. Note that (typename){initializer} is C99
-// feature to write struct literals.
-Type *type_void = &(Type){ KIND_VOID, 0, 0, false };
-Type *type_bool = &(Type){ KIND_BOOL, 1, 1, true };
-Type *type_char = &(Type){ KIND_CHAR, 1, 1, false };
-Type *type_short = &(Type){ KIND_SHORT, 2, 2, false };
-Type *type_int = &(Type){ KIND_INT, 4, 4, false };
-Type *type_long = &(Type){ KIND_LONG, 8, 8, false };
-Type *type_llong = &(Type){ KIND_LLONG, 8, 8, false };
-Type *type_uchar = &(Type){ KIND_CHAR, 1, 1, true };
-Type *type_ushort = &(Type){ KIND_SHORT, 2, 2, true };
-Type *type_uint = &(Type){ KIND_INT, 4, 4, true };
-Type *type_ulong = &(Type){ KIND_LONG, 8, 8, true };
-Type *type_ullong = &(Type){ KIND_LLONG, 8, 8, true };
-Type *type_float = &(Type){ KIND_INT, 1, 1, false };
-Type *type_double = &(Type){ KIND_INT, 1, 1, false };
-Type *type_ldouble = &(Type){ KIND_INT, 1, 1, false };
-Type *type_enum = &(Type){ KIND_ENUM, 4, 4, false };
+// Objects representing basic types. 
+// All variables will be of one of these types or a derived type from one of them. 
+// Note that (typename){initializer} is C99 feature to write struct literals.
+Type *type_void = &(Type) { KIND_VOID, 0, 0, false };
+Type *type_bool = &(Type) { KIND_BOOL, 1, 1, true };
+Type *type_char = &(Type) { KIND_CHAR, 1, 1, false };
+Type *type_short = &(Type) { KIND_SHORT, 2, 2, false };
+Type *type_int = &(Type) { KIND_INT, 4, 4, false };
+Type *type_long = &(Type) { KIND_LONG, 8, 8, false };
+Type *type_llong = &(Type) { KIND_LLONG, 8, 8, false };
+Type *type_uchar = &(Type) { KIND_CHAR, 1, 1, true };
+Type *type_ushort = &(Type) { KIND_SHORT, 2, 2, true };
+Type *type_uint = &(Type) { KIND_INT, 4, 4, true };
+Type *type_ulong = &(Type) { KIND_LONG, 8, 8, true };
+Type *type_ullong = &(Type) { KIND_LLONG, 8, 8, true };
+Type *type_float = &(Type) { KIND_INT, 1, 1, false };
+Type *type_double = &(Type) { KIND_INT, 1, 1, false };
+Type *type_ldouble = &(Type) { KIND_INT, 1, 1, false };
+Type *type_enum = &(Type) { KIND_ENUM, 4, 4, false };
 
-static Type* make_ptr_type(Type *ty);
-static Type* make_array_type(Type *ty, int size);
+static Type *make_ptr_type(Type *ty);
+static Type *make_array_type(Type *ty, int size);
 static Node *read_compound_stmt(void);
 static void read_decl_or_stmt(Vector *list);
 static Node *conv(Node *node);
@@ -159,35 +159,34 @@ static Node *make_ast(Node *tmpl) {
     return r;
 }
 
-static char* underscore(const char* src)
-{
-    char* out = malloc(strlen(src)+2);
+static char *underscore(const char *src) {
+    char *out = malloc(strlen(src) + 2);
     out[0] = '_';
-    strcpy(out+1, src);
+    strcpy(out + 1, src);
     return out;
 }
 
 static Node *ast_uop(int kind, Type *ty, Node *operand) {
-    return make_ast(&(Node){ kind, ty, .operand = operand });
+    return make_ast(&(Node) { kind, ty, .operand = operand });
 }
 
 static Node *ast_binop(Type *ty, int kind, Node *left, Node *right) {
-    Node *r = make_ast(&(Node){ kind, ty });
+    Node *r = make_ast(&(Node) { kind, ty });
     r->left = left;
     r->right = right;
     return r;
 }
 
 static Node *ast_inttype(Type *ty, long val) {
-    return make_ast(&(Node){ AST_LITERAL, ty, .ival = val });
+    return make_ast(&(Node) { AST_LITERAL, ty, .ival = val });
 }
 
 static Node *ast_floattype(Type *ty, double val) {
-    return make_ast(&(Node){ AST_LITERAL, ty, .fval = val });
+    return make_ast(&(Node) { AST_LITERAL, ty, .fval = val });
 }
 
 static Node *ast_lvar(Type *ty, char *name) {
-    Node *r = make_ast(&(Node){ AST_LVAR, ty, .varname = underscore(name) });
+    Node *r = make_ast(&(Node) { AST_LVAR, ty, .varname = underscore(name) });
     if (localenv)
         map_put(localenv, name, r);
     if (localvars)
@@ -196,24 +195,25 @@ static Node *ast_lvar(Type *ty, char *name) {
 }
 
 static Node *ast_gvar(Type *ty, char *name) {
-    Node *r = make_ast(&(Node){ AST_GVAR, ty, .varname = name, .glabel = underscore(name) });
+    Node *r = make_ast(&(Node) { AST_GVAR, ty, .varname = name, .glabel = underscore(name) });
     map_put(globalenv, name, r);
     return r;
 }
 
 static Node *ast_static_lvar(Type *ty, char *name) {
-    Node *r = make_ast(&(Node){
+    Node *r = make_ast(&(Node) {
         .kind = AST_GVAR,
-        .ty = ty,
-        .varname = name,
-        .glabel = make_static_label(name) });
+            .ty = ty,
+            .varname = name,
+            .glabel = make_static_label(name)
+    });
     assert(localenv);
     map_put(localenv, name, r);
     return r;
 }
 
 static Node *ast_typedef(Type *ty, char *name) {
-    Node *r = make_ast(&(Node){ AST_TYPEDEF, ty });
+    Node *r = make_ast(&(Node) { AST_TYPEDEF, ty });
     map_put(env(), name, r);
     return r;
 }
@@ -242,96 +242,99 @@ static Node *ast_string(int enc, char *str, int len) {
         break;
     }
     }
-    return make_ast(&(Node){ AST_LITERAL, .ty = ty, .sval = body });
+    return make_ast(&(Node) { AST_LITERAL, .ty = ty, .sval = body });
 }
 
 static Node *ast_funcall(Type *ftype, char *fname, Vector *args) {
-    return make_ast(&(Node){
+    return make_ast(&(Node) {
         .kind = AST_FUNCALL,
-        .ty = ftype->rettype,
-        .fname = fname,
-        .args = args,
-        .ftype = ftype });
+            .ty = ftype->rettype,
+            .fname = fname,
+            .args = args,
+            .ftype = ftype
+    });
 }
 
 static Node *ast_funcdesg(Type *ty, char *fname) {
-    return make_ast(&(Node){ AST_FUNCDESG, ty, .fname = underscore(fname) });
+    return make_ast(&(Node) { AST_FUNCDESG, ty, .fname = underscore(fname) });
 }
 
 static Node *ast_funcptr_call(Node *fptr, Vector *args) {
     assert(fptr->ty->kind == KIND_PTR);
     assert(fptr->ty->ptr->kind == KIND_FUNC);
-    return make_ast(&(Node){
+    return make_ast(&(Node) {
         .kind = AST_FUNCPTR_CALL,
-        .ty = fptr->ty->ptr->rettype,
-        .fptr = fptr,
-        .args = args });
+            .ty = fptr->ty->ptr->rettype,
+            .fptr = fptr,
+            .args = args
+    });
 }
 
 static Node *ast_func(Type *ty, char *fname, Vector *params, Node *body, Vector *localvars) {
-    return make_ast(&(Node){
+    return make_ast(&(Node) {
         .kind = AST_FUNC,
-        .ty = ty,
-        .fname = underscore(fname),
-        .params = params,
-        .localvars = localvars,
-        .body = body});
+            .ty = ty,
+            .fname = underscore(fname),
+            .params = params,
+            .localvars = localvars,
+            .body = body
+    });
 }
 
 static Node *ast_decl(Node *var, Vector *init) {
-    return make_ast(&(Node){ AST_DECL, .declvar = var, .declinit = init });
+    return make_ast(&(Node) { AST_DECL, .declvar = var, .declinit = init });
 }
 
 static Node *ast_init(Node *val, Type *totype, int off) {
-    return make_ast(&(Node){ AST_INIT, .initval = val, .initoff = off, .totype = totype });
+    return make_ast(&(Node) { AST_INIT, .initval = val, .initoff = off, .totype = totype });
 }
 
 static Node *ast_conv(Type *totype, Node *val) {
-    return make_ast(&(Node){ AST_CONV, totype, .operand = val });
+    return make_ast(&(Node) { AST_CONV, totype, .operand = val });
 }
 
 static Node *ast_if(Node *cond, Node *then, Node *els) {
-    return make_ast(&(Node){ AST_IF, .cond = cond, .then = then, .els = els });
+    return make_ast(&(Node) { AST_IF, .cond = cond, .then = then, .els = els });
 }
 
 static Node *ast_ternary(Type *ty, Node *cond, Node *then, Node *els) {
-    return make_ast(&(Node){ AST_TERNARY, ty, .cond = cond, .then = then, .els = els });
+    return make_ast(&(Node) { AST_TERNARY, ty, .cond = cond, .then = then, .els = els });
 }
 
 static Node *ast_return(Node *retval) {
-    return make_ast(&(Node){ AST_RETURN, .retval = retval });
+    return make_ast(&(Node) { AST_RETURN, .retval = retval });
 }
 
 static Node *ast_compound_stmt(Vector *stmts) {
-    return make_ast(&(Node){ AST_COMPOUND_STMT, .stmts = stmts });
+    return make_ast(&(Node) { AST_COMPOUND_STMT, .stmts = stmts });
 }
 
 static Node *ast_struct_ref(Type *ty, Node *struc, char *name) {
-    return make_ast(&(Node){ AST_STRUCT_REF, ty, .struc = struc, .field = underscore(name) });
+    return make_ast(&(Node) { AST_STRUCT_REF, ty, .struc = struc, .field = underscore(name) });
 }
 
 static Node *ast_goto(char *label) {
-    return make_ast(&(Node){ AST_GOTO, .label = label });
+    return make_ast(&(Node) { AST_GOTO, .label = label });
 }
 
 static Node *ast_jump(char *label) {
-    return make_ast(&(Node){ AST_GOTO, .label = label, .newlabel = label });
+    return make_ast(&(Node) { AST_GOTO, .label = label, .newlabel = label });
 }
 
 static Node *ast_computed_goto(Node *expr) {
-    return make_ast(&(Node){ AST_COMPUTED_GOTO, .operand = expr });
+    return make_ast(&(Node) { AST_COMPUTED_GOTO, .operand = expr });
 }
 
 static Node *ast_label(char *label) {
-    return make_ast(&(Node){ AST_LABEL, .label = underscore(label) });
+    return make_ast(&(Node) { AST_LABEL, .label = underscore(label) });
 }
 
 static Node *ast_dest(char *label) {
-    return make_ast(&(Node){ AST_LABEL, .label = label, .newlabel = label });
+    return make_ast(&(Node) { AST_LABEL, .label = label, .newlabel = label });
 }
 
 static Node *ast_label_addr(char *label) {
-    return make_ast(&(Node){ OP_LABEL_ADDR, make_ptr_type(type_void), .label = underscore(label) });
+    return make_ast(&(Node) { OP_LABEL_ADDR, make_ptr_type(type_void), .label = underscore(label) });
 }
 
 static Type *make_type(Type *tmpl) {
@@ -348,56 +351,63 @@ static Type *copy_type(Type *ty) {
 
 static Type *make_numtype(int kind, bool usig) {
     Type *r = calloc(1, sizeof(Type));
+    if (r == NULL) return NULL;
     r->kind = kind;
     r->usig = usig;
-    if (kind == KIND_VOID)         r->size = r->align = 0;
-    else if (kind == KIND_BOOL)    r->size = r->align = 1;
-    else if (kind == KIND_CHAR)    r->size = r->align = 1;
-    else if (kind == KIND_SHORT)   r->size = r->align = 2;
-    else if (kind == KIND_INT)     r->size = r->align = 4;
-    else if (kind == KIND_LONG)    r->size = r->align = 8;
-    else if (kind == KIND_LLONG)   r->size = r->align = 8;
-    else if (kind == KIND_FLOAT)   r->size = r->align = 4, error("float");
-    else if (kind == KIND_DOUBLE)  r->size = r->align = 8, error("float");
-    else if (kind == KIND_LDOUBLE) r->size = r->align = 8, error("float");
-    else error("internal error");
+    switch (kind) {
+    case KIND_VOID:    r->size = r->align = 0; break;
+    case KIND_BOOL:    r->size = r->align = 1; break;
+    case KIND_CHAR:    r->size = r->align = 1; break;
+    case KIND_SHORT:   r->size = r->align = 2; break;
+    case KIND_INT:     r->size = r->align = 4; break;
+    case KIND_LONG:    r->size = r->align = 8; break;
+    case KIND_LLONG:   r->size = r->align = 8; break;
+    case KIND_FLOAT:   r->size = r->align = 4; error("float"); break;
+    case KIND_DOUBLE:  r->size = r->align = 8; error("float"); break;
+    case KIND_LDOUBLE: r->size = r->align = 8; error("float"); break;
+    default:
+        error("internal error");
+        break;
+    }
     return r;
 }
 
-static Type* make_ptr_type(Type *ty) {
-    return make_type(&(Type){ KIND_PTR, .ptr = ty, .size = 8, .align = 8 });
+static Type *make_ptr_type(Type *ty) {
+    return make_type(&(Type) { KIND_PTR, .ptr = ty, .size = 8, .align = 8 });
 }
 
-static Type* make_array_type(Type *ty, int len) {
+static Type *make_array_type(Type *ty, int len) {
     int size;
     if (len == -1)
         size = -1;
     else
         size = ty->size * len;
-    return make_type(&(Type){
+    return make_type(&(Type) {
         KIND_ARRAY,
-        .ptr = ty,
-        .size = size,
-        .len = len,
-        .align = ty->align });
+            .ptr = ty,
+            .size = size,
+            .len = len,
+            .align = ty->align
+    });
 }
 
-static Type* make_rectype(bool is_struct) {
-    return make_type(&(Type){ KIND_STRUCT, .is_struct = is_struct });
+static Type *make_rectype(bool is_struct) {
+    return make_type(&(Type) { KIND_STRUCT, .is_struct = is_struct });
 }
 
-static Type* make_func_type(Type *rettype, Vector *paramtypes, bool has_varargs, bool oldstyle) {
-    return make_type(&(Type){
+static Type *make_func_type(Type *rettype, Vector *paramtypes, bool has_varargs, bool oldstyle) {
+    return make_type(&(Type) {
         KIND_FUNC,
-        .rettype = rettype,
-        .params = paramtypes,
-        .hasva = has_varargs,
-        .oldstyle = oldstyle,
-        .align = 1 });
+            .rettype = rettype,
+            .params = paramtypes,
+            .hasva = has_varargs,
+            .oldstyle = oldstyle,
+            .align = 1
+    });
 }
 
 static Type *make_stub_type() {
-    return make_type(&(Type){ KIND_STUB });
+    return make_type(&(Type) { KIND_STUB });
 }
 
 /*
@@ -813,7 +823,8 @@ static Vector *read_func_args(Vector *params) {
         Type *paramtype;
         if (i < vec_len(params)) {
             paramtype = vec_get(params, i++);
-        } else {
+        }
+        else {
             paramtype = is_flotype(arg->ty) ? type_double :
                 is_inttype(arg->ty) ? type_int :
                 arg->ty;
@@ -867,7 +878,8 @@ static Vector *read_generic_list(Node **defaultexpr) {
                 errort(tok, "default expression specified twice");
             expect(':');
             *defaultexpr = read_assignment_expr();
-        } else {
+        }
+        else {
             Type *ty = read_cast_type();
             expect(':');
             Node *expr = read_assignment_expr();
@@ -891,9 +903,9 @@ static Node *read_generic() {
         if (type_compatible(contexpr->ty, ty))
             return expr;
     }
-   if (!defaultexpr)
-       errort(tok, "no matching generic selection for %s: %s", node2s(contexpr), ty2s(contexpr->ty));
-   return defaultexpr;
+    if (!defaultexpr)
+        errort(tok, "no matching generic selection for %s: %s", node2s(contexpr), ty2s(contexpr->ty));
+    return defaultexpr;
 }
 
 /*
@@ -1040,7 +1052,7 @@ static Node *read_postfix_expr_tail(Node *node) {
         if (next_token(OP_ARROW)) {
             if (node->ty->kind != KIND_PTR)
                 error("pointer type expected, but got %s %s",
-                      ty2s(node->ty), node2s(node));
+                    ty2s(node->ty), node2s(node));
             node = ast_uop(AST_DEREF, node->ty->ptr, node);
             node = read_struct_field(node);
             continue;
@@ -1178,7 +1190,7 @@ static Node *read_multiplicative_expr() {
 static Node *read_additive_expr() {
     Node *node = read_multiplicative_expr();
     for (;;) {
-        if      (next_token('+')) node = binop('+', conv(node), conv(read_multiplicative_expr()));
+        if (next_token('+')) node = binop('+', conv(node), conv(read_multiplicative_expr()));
         else if (next_token('-')) node = binop('-', conv(node), conv(read_multiplicative_expr()));
         else    return node;
     }
@@ -1205,8 +1217,8 @@ static Node *read_shift_expr() {
 static Node *read_relational_expr() {
     Node *node = read_shift_expr();
     for (;;) {
-        if      (next_token('<'))   node = binop('<',   conv(node), conv(read_shift_expr()));
-        else if (next_token('>'))   node = binop('<',   conv(read_shift_expr()), conv(node));
+        if (next_token('<'))   node = binop('<', conv(node), conv(read_shift_expr()));
+        else if (next_token('>'))   node = binop('<', conv(read_shift_expr()), conv(node));
         else if (next_token(OP_LE)) node = binop(OP_LE, conv(node), conv(read_shift_expr()));
         else if (next_token(OP_GE)) node = binop(OP_LE, conv(read_shift_expr()), conv(node));
         else    return node;
@@ -1219,9 +1231,11 @@ static Node *read_equality_expr() {
     Node *r;
     if (next_token(OP_EQ)) {
         r = binop(OP_EQ, conv(node), conv(read_equality_expr()));
-    } else if (next_token(OP_NE)) {
+    }
+    else if (next_token(OP_NE)) {
         r = binop(OP_NE, conv(node), conv(read_equality_expr()));
-    } else {
+    }
+    else {
         return node;
     }
     r->ty = type_int;
@@ -1473,14 +1487,16 @@ static Dict *update_struct_offset(int *rsize, int *align, Vector *fields) {
             if (fieldtype->bitsize <= room) {
                 fieldtype->offset = off;
                 fieldtype->bitoff = bitoff;
-            } else {
+            }
+            else {
                 finish_bitfield(&off, &bitoff);
                 off += compute_padding(off, fieldtype->align);
                 fieldtype->offset = off;
                 fieldtype->bitoff = 0;
             }
             bitoff += fieldtype->bitsize;
-        } else {
+        }
+        else {
             finish_bitfield(&off, &bitoff);
             off += compute_padding(off, fieldtype->align);
             fieldtype->offset = off;
@@ -1538,7 +1554,8 @@ static Type *read_rectype_def(bool is_struct) {
             r = make_rectype(is_struct);
             map_put(tags, tag, r);
         }
-    } else {
+    }
+    else {
         r = make_rectype(is_struct);
     }
     int size = 0, align = 1;
@@ -1652,10 +1669,12 @@ static void read_initializer_elem(Vector *inits, Type *ty, int off, bool designa
     next_token('=');
     if (ty->kind == KIND_ARRAY || ty->kind == KIND_STRUCT) {
         read_initializer_list(inits, ty, off, designated);
-    } else if (next_token('{')) {
+    }
+    else if (next_token('{')) {
         read_initializer_elem(inits, ty, off, true);
         expect('}');
-    } else {
+    }
+    else {
         Node *expr = conv(read_assignment_expr());
         ensure_assignable(ty, expr->ty);
         vec_push(inits, ast_init(expr, ty, off));
@@ -1707,7 +1726,8 @@ static void read_struct_initializer_sub(Vector *inits, Type *ty, int off, bool d
                     break;
             }
             designated = true;
-        } else {
+        }
+        else {
             unget_token(tok);
             if (i == vec_len(keys))
                 break;
@@ -1753,7 +1773,8 @@ static void read_array_initializer_sub(Vector *inits, Type *ty, int off, bool de
             i = idx;
             expect(']');
             designated = true;
-        } else {
+        }
+        else {
             unget_token(tok);
         }
         read_initializer_elem(inits, ty->ptr, off + elemsize * i, designated);
@@ -1762,7 +1783,7 @@ static void read_array_initializer_sub(Vector *inits, Type *ty, int off, bool de
     }
     if (has_brace)
         skip_to_brace();
- finish:
+finish:
     if (ty->len == -1) {
         ty->len = i;
         ty->size = elemsize * i;
@@ -1791,9 +1812,11 @@ static void read_initializer_list(Vector *inits, Type *ty, int off, bool designa
     unget_token(tok);
     if (ty->kind == KIND_ARRAY) {
         read_array_initializer(inits, ty, off, designated);
-    } else if (ty->kind == KIND_STRUCT) {
+    }
+    else if (ty->kind == KIND_STRUCT) {
         read_struct_initializer(inits, ty, off, designated);
-    } else {
+    }
+    else {
         Type *arraytype = make_array_type(ty, 1);
         read_array_initializer(inits, arraytype, off, designated);
     }
@@ -1803,7 +1826,8 @@ static Vector *read_decl_init(Type *ty) {
     Vector *r = make_vector();
     if (is_keyword(peek(), '{') || is_string(ty)) {
         read_initializer_list(r, ty, 0, false);
-    } else {
+    }
+    else {
         Node *init = conv(read_assignment_expr());
         if (is_arithtype(init->ty) && init->ty->kind != ty->kind)
             init = ast_conv(ty, init);
@@ -1836,7 +1860,8 @@ static Type *read_func_param(char **name, bool optional) {
     Type *basety = type_int;
     if (is_type(peek())) {
         basety = read_decl_spec(&sclass);
-    } else if (optional) {
+    }
+    else if (optional) {
         errort(peek(), "type expected, but got %s", tok2s(peek()));
     }
     Type *ty = read_declarator(name, basety, NULL, optional ? DECL_PARAM_TYPEONLY : DECL_PARAM);
@@ -1929,7 +1954,8 @@ static Type *read_declarator_array(Type *basety) {
     int len;
     if (next_token(']')) {
         len = -1;
-    } else {
+    }
+    else {
         len = read_intexpr();
         expect(']');
     }
@@ -2115,7 +2141,7 @@ static Type *read_decl_spec(int *rsclass) {
             unget_token(tok);
             goto done;
         }
-      errcheck:
+    errcheck:
         if (kind == kbool && (size != 0 && sig != 0))
             goto err;
         if (size == kshort && (kind != 0 && kind != kint))
@@ -2127,7 +2153,7 @@ static Type *read_decl_spec(int *rsclass) {
         if (usertype && (kind != 0 || size != 0 || sig != 0))
             goto err;
     }
- done:
+done:
     if (rsclass)
         *rsclass = sclass;
     if (usertype)
@@ -2155,11 +2181,11 @@ static Type *read_decl_spec(int *rsclass) {
     default:     ty = make_numtype(KIND_INT, sig == kunsigned); goto end;
     }
     error("internal error: kind: %d, size: %d", kind, size);
- end:
+end:
     if (align != -1)
         ty->align = align;
     return ty;
- err:
+err:
     errort(tok, "type mismatch: %s", tok2s(tok));
 }
 
@@ -2197,15 +2223,18 @@ static void read_decl(Vector *block, bool isglobal) {
         ty->isstatic = (sclass == S_STATIC);
         if (sclass == S_TYPEDEF) {
             ast_typedef(ty, name);
-        } else if (ty->isstatic && !isglobal) {
+        }
+        else if (ty->isstatic && !isglobal) {
             ensure_not_void(ty);
             read_static_local_var(ty, name);
-        } else {
+        }
+        else {
             ensure_not_void(ty);
             Node *var = (isglobal ? ast_gvar : ast_lvar)(ty, name);
             if (next_token('=')) {
                 vec_push(block, ast_decl(var, read_decl_init(ty)));
-            } else if (sclass != S_EXTERN && ty->kind != KIND_FUNC) {
+            }
+            else if (sclass != S_EXTERN && ty->kind != KIND_FUNC) {
                 vec_push(block, ast_decl(var, NULL));
             }
         }
@@ -2508,7 +2537,8 @@ static Node *make_switch_jump(Node *var, Case *c) {
     Node *cond;
     if (c->beg == c->end) {
         cond = ast_binop(type_int, OP_EQ, var, ast_inttype(type_int, c->beg));
-    } else {
+    }
+    else {
         // [GNU] case i ... j is compiled to if (i <= cond && cond <= j) goto <label>.
         Node *x = ast_binop(type_int, OP_LE, ast_inttype(type_int, c->beg), var);
         Node *y = ast_binop(type_int, OP_LE, var, ast_inttype(type_int, c->end));
@@ -2586,7 +2616,8 @@ static Node *read_case_label(Token *tok) {
         if (beg > end)
             errort(tok, "case region is not in correct order: %d ... %d", beg, end);
         vec_push(cases, make_case(beg, end, label));
-    } else {
+    }
+    else {
         expect(':');
         vec_push(cases, make_case(beg, beg, label));
     }
@@ -2705,9 +2736,11 @@ static void read_decl_or_stmt(Vector *list) {
     mark_location();
     if (is_type(tok)) {
         read_decl(list, false);
-    } else if (next_token(KSTATIC_ASSERT)) {
+    }
+    else if (next_token(KSTATIC_ASSERT)) {
         read_static_assert();
-    } else {
+    }
+    else {
         Node *stmt = read_stmt();
         if (stmt)
             vec_push(list, stmt);
@@ -2734,7 +2767,7 @@ Vector *read_toplevels() {
  * Token handling
  */
 
-// C11 5.1.1.2p6 Adjacent string literal tokens are concatenated.
+ // C11 5.1.1.2p6 Adjacent string literal tokens are concatenated.
 static void concatenate_string(Token *tok) {
     int enc = tok->enc;
     Buffer *b = make_buffer();

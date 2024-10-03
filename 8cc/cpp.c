@@ -1,9 +1,11 @@
+//
+// 8CC TOY C COMPILER (PS4 Port)
+//
 // Copyright 2012 Rui Ueyama. Released under the MIT license.
-
-/*
- * This implements Dave Prosser's C Preprocessing algorithm, described
- * in this document: https://github.com/rui314/8cc/wiki/cpp.algo.pdf
- */
+// ---------------
+// This implements Dave Prosser's C Preprocessing algorithm, described in this document:
+// - https://github.com/rui314/8cc/wiki/cpp.algo.pdf
+//
 
 #include <ctype.h>
 #include <libgen.h>
@@ -14,33 +16,53 @@
 #include <unistd.h>
 #include "8cc.h"
 
-static Map *macros = &EMPTY_MAP;
-static Map *once = &EMPTY_MAP;
-static Map *keywords = &EMPTY_MAP;
-static Map *include_guard = &EMPTY_MAP;
-static Vector *cond_incl_stack = &EMPTY_VECTOR;
-static Vector *std_include_path = &EMPTY_VECTOR;
+
+static Map *macros = &EMPTY_MAP;                 // Pointer to the map of defined macros
+static Map *once = &EMPTY_MAP;                   // Pointer to the map for once-only includes (include guards)
+static Map *keywords = &EMPTY_MAP;               // Pointer to the map of keywords
+static Map *include_guard = &EMPTY_MAP;          // Pointer to the map for include guards
+static Vector *cond_incl_stack = &EMPTY_VECTOR;  // Pointer to the stack of conditional includes
+static Vector *std_include_path = &EMPTY_VECTOR; // Pointer to the standard include path
+
+// Structure to hold the current time
 static struct tm now;
-static Token *cpp_token_zero = &(Token){ .kind = TNUMBER, .sval = "0" };
-static Token *cpp_token_one = &(Token){ .kind = TNUMBER, .sval = "1" };
 
+// Pointer to a token representing the numeric value 0
+static Token *cpp_token_zero = &(Token) { .kind = TNUMBER, .sval = "0" };
+// Pointer to a token representing the numeric value 1
+static Token *cpp_token_one = &(Token) { .kind = TNUMBER, .sval = "1" };
+// Type definition for a special macro handler function
 typedef void SpecialMacroHandler(Token *tok);
-typedef enum { IN_THEN, IN_ELIF, IN_ELSE } CondInclCtx;
-typedef enum { MACRO_OBJ, MACRO_FUNC, MACRO_SPECIAL } MacroType;
 
-typedef struct {
-    CondInclCtx ctx;
-    char *include_guard;
-    File *file;
-    bool wastrue;
+// Enum for the context of conditional inclusion
+typedef enum COND_INCL_CTX {
+    IN_THEN,   // In the "then" branch of a conditional
+    IN_ELIF,   // In the "elif" branch of a conditional
+    IN_ELSE    // In the "else" branch of a conditional
+} CondInclCtx;
+
+// Enum for different types of macros
+typedef enum E_Macro_Type {
+    MACRO_OBJ,    // Object-like macro
+    MACRO_FUNC,   // Function-like macro
+    MACRO_SPECIAL // Special macro with custom handling
+} MacroType;
+
+// Structure representing conditional inclusion details
+typedef struct CondIncl_t {
+    CondInclCtx ctx;        // Current context of conditional inclusion
+    char *include_guard;    // Include guard for the current file
+    File *file;             // File associated with this conditional inclusion
+    bool wastrue;           // Indicates if the condition was true
 } CondIncl;
 
-typedef struct {
-    MacroType kind;
-    int nargs;
-    Vector *body;
-    bool is_varg;
-    SpecialMacroHandler *fn;
+// Structure representing a macro definition
+typedef struct Macro_t {
+    MacroType kind;          // Type of the macro (object, function, or special)
+    int nargs;               // Number of arguments for the macro
+    Vector *body;            // Body of the macro
+    bool is_varg;            // Indicates if the macro accepts variable arguments
+    SpecialMacroHandler *fn; // Pointer to a function handling special macros
 } Macro;
 
 static Macro *make_obj_macro(Vector *body);
@@ -50,62 +72,109 @@ static void define_obj_macro(char *name, Token *value);
 static void read_directive(Token *hash);
 static Token *read_expand(void);
 
-/*
- * Constructors
- */
 
+// ---------------- //
+// - Constructors - //
+// ---------------- //
+
+
+// Creates a new conditional inclusion structure with
+// the specified truth value
 static CondIncl *make_cond_incl(bool wastrue) {
+    // Allocate memory for CondIncl and initialize to zero.
+    // If this allocation fails, we return early with NULL
     CondIncl *r = calloc(1, sizeof(CondIncl));
-    r->ctx = IN_THEN;
-    r->wastrue = wastrue;
-    return r;
+    if (r == NULL) return NULL;
+
+    r->ctx = IN_THEN;     // Set the initial context to IN_THEN
+    r->wastrue = wastrue; // Set the truth value
+    return r;             // Return the newly created CondIncl structure
 }
 
+// Creates a new macro structure based on a template macro
 static Macro *make_macro(Macro *tmpl) {
+    // Allocate memory for a Macro, if this allocation fails
+    // we return early with NULL
     Macro *r = malloc(sizeof(Macro));
-    *r = *tmpl;
-    return r;
+    if (r == NULL) return NULL;
+
+    *r = *tmpl; // Copy the template macro's contents
+    return r;   // Return the new macro
 }
 
+// Creates a new object-like macro with the specified body
 static Macro *make_obj_macro(Vector *body) {
-    return make_macro(&(Macro){ MACRO_OBJ, .body = body });
+    Macro objMacro = {};          // Initialize a Macro structure
+    objMacro.kind = MACRO_OBJ;    // Set the kind to object-like
+    objMacro.body = body;         // Set the body of the macro
+    return make_macro(&objMacro); // Create and return the macro using the template
 }
 
+// Creates a new function-like macro with the specified body, 
+// number of arguments, and variable argument flag
 static Macro *make_func_macro(Vector *body, int nargs, bool is_varg) {
-    return make_macro(&(Macro){
-            MACRO_FUNC, .nargs = nargs, .body = body, .is_varg = is_varg });
+    Macro funcMacro = {}; // Initialize a Macro structure
+    funcMacro.kind = MACRO_FUNC; // Set the kind to function-like
+    funcMacro.nargs = nargs; // Set the number of arguments
+    funcMacro.body = body; // Set the body of the macro
+    funcMacro.is_varg = is_varg; // Set the variable argument flag
+    return make_macro(&funcMacro); // Create and return the macro using the template
 }
 
+// Creates a new special macro with the specified handler function
 static Macro *make_special_macro(SpecialMacroHandler *fn) {
-    return make_macro(&(Macro){ MACRO_SPECIAL, .fn = fn });
+    Macro specialMacro = {};           // Initialize a Macro structure
+    specialMacro.kind = MACRO_SPECIAL; // Set the kind to special
+    specialMacro.fn = fn;              // Set the special handler function
+    return make_macro(&specialMacro);  // Create and return the macro using the template
 }
 
+// Creates a new token for a macro parameter at the specified 
+// position with a variable argument flag
 static Token *make_macro_token(int position, bool is_vararg) {
+    // Allocate memory for a Token, and check if the allocation
+    // failed, which if true, we return early with NULL
     Token *r = malloc(sizeof(Token));
-    r->kind = TMACRO_PARAM;
-    r->is_vararg = is_vararg;
-    r->hideset = NULL;
-    r->position = position;
-    r->space = false;
-    r->bol = false;
-    return r;
+    if (r == NULL) return NULL;
+
+    r->kind = TMACRO_PARAM;   // Set the token kind to macro parameter
+    r->is_vararg = is_vararg; // Set the variable argument flag
+    r->hideset = NULL;        // Initialize hideset to NULL
+    r->position = position;   // Set the position of the token
+    r->space = false;         // Initialize space flag
+    r->bol = false;           // Initialize beginning of line flag
+    return r;                 // Return the newly created macro token
 }
 
+// Creates a copy of the given token by allocating memory and 
+// duplicating its contents
 static Token *copy_token(Token *tok) {
+    // Allocate memory for a Token, and check if the allocation
+    // failed, which if true, we return early with NULL
     Token *r = malloc(sizeof(Token));
-    *r = *tok;
-    return r;
+    if (r == NULL) return NULL;
+
+    *r = *tok; // Copy the contents of the original token
+    return r;  // Return the copied token
 }
 
+// Expects a specific character token and checks if the next 
+// token matches it, and if the next token does not match an
+// error is reported
 static void cpp_expect(char id) {
+    // Lex the next token
     Token *tok = lex();
+
+    // Check if the token matches the expected character, and
+    // if it does not match, report an error
     if (!is_keyword(tok, id))
         errort(tok, "%c expected, but got %s", id, tok2s(tok));
 }
 
-/*
- * Utility functions
- */
+
+//
+// Utility functions
+//
 
 bool is_ident(Token *tok, char *s) {
     return tok->kind == TIDENT && !strcmp(tok->sval, s);
@@ -115,6 +184,7 @@ static bool cpp_next(int id) {
     Token *tok = lex();
     if (is_keyword(tok, id))
         return true;
+
     unget_token(tok);
     return false;
 }
@@ -122,14 +192,15 @@ static bool cpp_next(int id) {
 static void propagate_space(Vector *tokens, Token *tmpl) {
     if (vec_len(tokens) == 0)
         return;
+
     Token *tok = copy_token(vec_head(tokens));
     tok->space = tmpl->space;
     vec_set(tokens, 0, tok);
 }
 
-/*
- * Macro expander
- */
+//
+// Macro expander
+//
 
 static Token *cpp_read_ident() {
     Token *tok = lex();
@@ -219,6 +290,7 @@ static Vector *add_hide_set(Vector *tokens, Set *hideset) {
 
 static Token *glue_tokens(Token *t, Token *u) {
     Buffer *b = make_buffer();
+    if (b == NULL) return NULL;
     buf_printf(b, "%s", tok2s(t));
     buf_printf(b, "%s", tok2s(u));
     Token *r = lex_string(buf_body(b));
@@ -232,6 +304,7 @@ static void glue_push(Vector *tokens, Token *tok) {
 
 static Token *stringize(Token *tmpl, Vector *args) {
     Buffer *b = make_buffer();
+    if (b == NULL) return NULL;
     for (int i = 0; i < vec_len(args); i++) {
         Token *tok = vec_get(args, i);
         if (buf_len(b) && tok->space)
@@ -328,36 +401,39 @@ static Token *read_expand_newline() {
     Token *tok = lex();
     if (tok->kind != TIDENT)
         return tok;
+
     char *name = tok->sval;
     Macro *macro = map_get(macros, name);
     if (!macro || set_has(tok->hideset, name))
         return tok;
 
     switch (macro->kind) {
-    case MACRO_OBJ: {
-        Set *hideset = set_add(tok->hideset, name);
-        Vector *tokens = subst(macro, NULL, hideset);
-        propagate_space(tokens, tok);
-        unget_all(tokens);
-        return read_expand();
-    }
-    case MACRO_FUNC: {
-        if (!cpp_next('('))
-            return tok;
-        Vector *args = read_args(tok, macro);
-        Token *rparen = peek_token();
-        cpp_expect(')');
-        Set *hideset = set_add(set_intersection(tok->hideset, rparen->hideset), name);
-        Vector *tokens = subst(macro, args, hideset);
-        propagate_space(tokens, tok);
-        unget_all(tokens);
-        return read_expand();
-    }
-    case MACRO_SPECIAL:
-        macro->fn(tok);
-        return read_expand();
-    default:
-        error("internal error");
+        case MACRO_OBJ:
+        {
+            Set *hideset = set_add(tok->hideset, name);
+            Vector *tokens = subst(macro, NULL, hideset);
+            propagate_space(tokens, tok);
+            unget_all(tokens);
+            return read_expand();
+        }
+        case MACRO_FUNC:
+        {
+            if (!cpp_next('('))
+                return tok;
+            Vector *args = read_args(tok, macro);
+            Token *rparen = peek_token();
+            cpp_expect(')');
+            Set *hideset = set_add(set_intersection(tok->hideset, rparen->hideset), name);
+            Vector *tokens = subst(macro, args, hideset);
+            propagate_space(tokens, tok);
+            unget_all(tokens);
+            return read_expand();
+        }
+        case MACRO_SPECIAL:
+            macro->fn(tok);
+            return read_expand();
+        default:
+            error("internal error");
     }
 }
 
@@ -712,7 +788,7 @@ static void read_include(Token *hash, File *file, bool isimport) {
     for (int i = 0; i < vec_len(std_include_path); i++)
         if (try_include(vec_get(std_include_path, i), filename, isimport))
             return;
-  err:
+err:
     errort(hash, "cannot find header file: %s", filename);
 #endif
 }
@@ -743,7 +819,7 @@ static void read_include_next(Token *hash, File *file) {
     for (i++; i < vec_len(std_include_path); i++)
         if (try_include(vec_get(std_include_path, i), filename, false))
             return;
-  err:
+err:
     errort(hash, "cannot find header file: %s", filename);
 #endif
 }
@@ -856,7 +932,7 @@ static void read_directive(Token *hash) {
     else goto err;
     return;
 
-  err:
+err:
     errort(hash, "unsupported preprocessor directive: %s", tok2s(tok));
 }
 
@@ -966,7 +1042,7 @@ static void init_predefined_macros() {
 #endif
     define_special_macro("__FILE__", handle_file_macro);
     define_special_macro("__LINE__", handle_line_macro);
-    define_special_macro("_Pragma",  handle_pragma_macro);
+    define_special_macro("_Pragma", handle_pragma_macro);
     // [GNU] Non-standard macros
     define_special_macro("__BASE_FILE__", handle_base_file_macro);
     define_special_macro("__COUNTER__", handle_counter_macro);

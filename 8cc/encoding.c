@@ -7,7 +7,6 @@
 // (wchar_t or char32_t strings).
 // Unprefixed or u8 strings are supposed to be in UTF-8 endcoding.
 // Source files are supposed to be written in UTF-8.
-
 #include "8cc.h"
 
 static int count_leading_ones(char c) {
@@ -29,15 +28,15 @@ static int read_rune(uint32_t *r, char *s, char *end) {
         if ((s[i] & 0xC0) != 0x80)
             error("invalid UTF-8 continuation byte");
     switch (len) {
-    case 2:
-        *r = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
-        return 2;
-    case 3:
-        *r = ((s[0] & 0xF) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
-        return 3;
-    case 4:
-        *r = ((s[0] & 0x7) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
-        return 4;
+        case 2:
+            *r = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
+            return 2;
+        case 3:
+            *r = ((s[0] & 0xF) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+            return 3;
+        case 4:
+            *r = ((s[0] & 0x7) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
+            return 4;
     }
     error("invalid UTF-8 sequence");
 }

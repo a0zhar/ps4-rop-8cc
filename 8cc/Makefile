@@ -1,74 +1,45 @@
-CFLAGS=-Wall -Wno-strict-aliasing -std=gnu11 -g -I. -O0
-OBJS=cpp.o debug.o dict.o gen.o lex.o vector.o parse.o buffer.o map.o \
-     error.o path.o file.o set.o encoding.o
-TESTS := $(patsubst %.c,%.bin,$(filter-out test/testmain.c,$(wildcard test/*.c)))
-ECC=./8cc
+# Compiler and flags
+CFLAGS  := -Wall -Wno-strict-aliasing -std=gnu11 -g -I. -O0
+ECC     := ./8cc
+
+# Directory for object files
+OBJ_DIR := ./build
+
+# Ensure the object directory exists before building
+mkdir_obj_dir := $(shell mkdir -p $(OBJ_DIR))
+
+# Automatically find all .c files and generate corresponding .o file paths
+SRCS     := $(wildcard *.c) 
+OBJS     := $(patsubst %.c,$(OBJ_DIR)/%.o,$(filter-out main.c,$(SRCS)))
+MAIN_OBJ := $(OBJ_DIR)/main.o  # Separate variable for main.o
+
+# Include specific header file
 override CFLAGS += -DBUILD_DIR='"$(shell pwd)"'
 
-8cc: 8cc.h main.o $(OBJS)
-	cc -o $@ main.o $(OBJS) $(LDFLAGS)
+# Target for creating the executable
+8cc: 8cc.h $(OBJS) $(MAIN_OBJ)
+	@echo "Linking main.o and object files to create 8cc"
+	@cc -o $@ $(OBJS) $(MAIN_OBJ) $(LDFLAGS) 
 
-$(OBJS) utiltest.o main.o: 8cc.h keyword.inc
+# Compile source files into object files in the build directory
+$(OBJ_DIR)/%.o: %.c | $(OBJ_DIR)
+	@echo "Compiling $< into $@"
+	@cc $(CFLAGS) -o $@ -c $<
 
-utiltest: 8cc.h utiltest.o $(OBJS)
-	cc -o $@ utiltest.o $(OBJS) $(LDFLAGS)
+# Ensure the object directory exists before building
+$(OBJ_DIR):
+	@mkdir -p $(OBJ_DIR)
 
-test/%.o: test/%.c
-	$(CC) $(CFLAGS) -w -o $@ -c $<
-
-test/%.bin: test/%.o test/testmain.o
-	cc -o $@ $< test/testmain.o $(LDFLAGS)
-
-self: 8cc cleanobj
-	$(MAKE) CC=$(ECC) CFLAGS= 8cc
-
-test: 8cc
-	$(MAKE) CC=$(ECC) CFLAGS= utiltest $(TESTS)
-	./utiltest
-	./test/ast.sh
-	./test/negative.py
-	$(MAKE) runtests
-
-runtests:
-	@for test in $(TESTS); do  \
-	    ./$$test || exit;      \
-	done
-
-stage1:
-	$(MAKE) cleanobj
-	[ -f 8cc ] || $(MAKE) 8cc
-	mv 8cc stage1
-
-stage2: stage1
-	$(MAKE) cleanobj
-	$(MAKE) CC=./stage1 ECC=./stage1 CFLAGS= 8cc
-	mv 8cc stage2
-
-stage3: stage2
-	$(MAKE) cleanobj
-	$(MAKE) CC=./stage2 ECC=./stage2 CFLAGS= 8cc
-	mv 8cc stage3
-
-# Compile and run the tests with the default compiler.
-testtest:
-	$(MAKE) clean
-	$(MAKE) $(TESTS)
-	$(MAKE) runtests
-
-fulltest: testtest
-	$(MAKE) stage1
-	$(MAKE) CC=./stage1 ECC=./stage1 CFLAGS= test
-	$(MAKE) stage2
-	$(MAKE) CC=./stage2 ECC=./stage2 CFLAGS= test
-	$(MAKE) stage3
-	cmp stage2 stage3
-
+# Clean up artifacts
 clean: cleanobj
-	rm -f 8cc stage?
+	@echo "Cleaning up build artifacts"
+	@rm -f 8cc stage?
 
 cleanobj:
-	rm -f *.o *.s test/*.o test/*.bin utiltest
+	@echo "Removing object files"
+	@rm -f $(OBJ_DIR)/*.o *.s 
 
+# Default target
 all: 8cc
 
-.PHONY: clean cleanobj test runtests fulltest self all
+.PHONY: clean cleanobj all self
