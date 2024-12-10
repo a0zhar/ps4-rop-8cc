@@ -1,68 +1,55 @@
-# ps4-rop-8cc
+# PS4-ROP-8CC
 
-This is a port of shinh's [ELVM branch of 8cc](https://github.com/shinh/8cc/tree/eir) to the PS4 return-oriented programming. It runs C code on OFW 6.51 (EDIT: 6.72 confirmed to be working too) via [Fire30's WebKit exploit](https://github.com/Fire30/bad_hoist).
+This is a port of shinh's [ELVM branch of 8cc](https://github.com/shinh/8cc/tree/eir) to the PS4 return-oriented programming. 
+It runs C code on OFW 6.51 (EDIT: 6.72 confirmed to be working too) via [Fire30's WebKit exploit](https://github.com/Fire30/bad_hoist).
 
-## Building
-
-Simply run `make` and follow the instructions to setup the toolchain.
 
 ## Running
+A reference script, `scripts/run.py`, is provided. 
+- Example: `python3 scripts/run.py file1.c [file2.c]...`
 
-A reference script, `scripts/run.py`, is provided.
 
-`python3 scripts/run.py file1.c [file2.c]...`
+## **Custom ABI**
 
-Look at its source code if you want more precise control over what's happening.
+ELVM register mappings for x64 are adjusted for PS4 compatibility:
 
-## ABI
+| **ELVM Register** | **x64 Register** | **Notes**                       |
+|--------------------|------------------|----------------------------------|
+| A                  | rax              | Primary accumulator             |
+| B                  | rcx              | Return value register           |
+| C                  | r10              | General-purpose register        |
+| D                  | --               | Not used by the compiler        |
+| SP                 | rdi              | Emulated stack pointer          |
+| BP                 | r8               | Emulated base pointer           |
 
-ELVM/x64 register mapping:
+- The stack (`rsp`) is used for the ROP chain, requiring stack emulation in user code.
+- Function calls follow a modified **cdecl** convention: `push next ; jmp func ; next:`. The return value resides in `B` (`rcx`).
 
-```
-ELVM    x64     notes
-A       rax
-B       rcx
-C       r10
-D       --      the compiler never uses the D register
-SP      rdi     rsp is used for the ropchain, so the stack has to be emulated
-BP      r8
-```
+### **Calling Conventions**
 
-The compiler has been modified so that memory addressing and type sizes are the same as in native code. This allows native headers (e.g. from [OpenOrbis SDK](https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain)) to be included directly.
+The compiler supports mixed ROP-to-ROP and ROP-to-native calls, converting conventions as needed. <br>
+Native-to-ROP calls require explicit handling, typically with the provided `librop` utilities:
 
-The calling convention is essentially CDECL, with `call` being implemented as `push next ; jmp func ; next:`. That is, `SP` (`rdi`) points to the return address on function entry. The result is returned in `B` (`rcx`).
-
-The compiler detects whether a given function call is a rop-to-rop or rop-to-native call, and converts the calling convention if necessary. For native-to-rop calls the conversion has to be performed explicitly:
-
-```
+```c
 #include <librop/extcall.h>
-
-void native_func(..., void(*)(...), void* opaque, ...);
-void my_very_func(void* opaque, ...); // only this format is supported
-
 ...
-
+void native_func(..., void(*)(...), void* opaque, ...);
+void my_very_func(void* opaque, ...);  // Supported format
+...
 extcall_t ec;
-char stack[8192]; // emulated stack to be used by my_very_func
+char stack[8192];  // Emulated stack for my_very_func
 create_extcall(ec, my_very_func, stack + 8192, opaque);
 native_func(..., extcall_gadget, ec, ...);
 ```
 
-To call a native function pointer, you must call `rop_call_funcptr` or implement the same functionality yourself:
+To invoke a native function pointer, use the `rop_call_funcptr` utility or equivalent:
 
-`rop_call_funcptr(ptr_to_printf, "Hello, %s!\n", "world");`
+```c
+rop_call_funcptr(ptr_to_printf, "Hello, %s!\n", "world");
+```
 
-Note: there is a ready-to-use wrapper for `pthread_create` in `librop/pthread_create.h` that will perform the conversion for you.
+For threading support, `librop/pthread_create.h` includes a ready-to-use wrapper for `pthread_create`.
 
-## Speed
 
-This is no speed demon. `8cc` compiles the C code to a stack machine, and is is then run on a software-emulated stack. The use of ROP further slows things down by essentially disabling CPU branch prediction. The end result is that an empty `for` loop does about 1e6 iterations per second.
-
-## Known bugs
-
-* ~~Code using global or static variables won't compile. Use `mmap` if you are not happy with 64KB of stack.~~ Probably fixed.
-* The constant-parsing code stores constants as `int` internally. This means that 64-bit constants won't work.
-* 64-bit integer comparison is always signed.
-* Arithmetic shift right is not supported (yet).
-* The generated ROP is reentrant but not thread-safe. That is, one ROP function can only be called on a single thread. This does not apply to rop-to-native calls.
-* Although the toolchain uses full FreeBSD headers, only the functions that map 1:1 to system calls can be used.
+# Credits
+- [Sleirsgoevy](https://github.com/Sleirsgoevy/ps4-rop-8cc)
